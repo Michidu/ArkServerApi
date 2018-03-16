@@ -5,6 +5,7 @@
 
 #include "SafeZoneManager.h"
 #include "Hooks.h"
+#include "Commands.h"
 
 #pragma comment(lib, "ArkApi.lib")
 #pragma comment(lib, "Permissions.lib")
@@ -32,6 +33,8 @@ namespace SafeZones
 	{
 		Log::Get().Init("SafeZone");
 
+		srand(static_cast<unsigned>(time(nullptr)));
+
 		try
 		{
 			ReadConfig();
@@ -43,6 +46,13 @@ namespace SafeZones
 		}
 
 		Hooks::InitHooks();
+		Commands::Init();
+	}
+
+	void Clean()
+	{
+		Hooks::RemoveHooks();
+		Commands::Clean();
 	}
 }
 
@@ -54,6 +64,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		SafeZones::Init();
 		break;
 	case DLL_PROCESS_DETACH:
+		SafeZones::Clean();
 		break;
 	}
 	return TRUE;

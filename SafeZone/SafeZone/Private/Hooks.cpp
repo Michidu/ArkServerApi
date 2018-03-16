@@ -1,5 +1,8 @@
 #include "Hooks.h"
+
 #include "SafeZoneManager.h"
+#include "SafeZones.h"
+#include "SzTools.h"
 
 namespace SafeZones::Hooks
 {
@@ -10,6 +13,8 @@ namespace SafeZones::Hooks
 	DECLARE_HOOK(APrimalCharacter_TakeDamage, float, APrimalCharacter*, float, FDamageEvent*, AController*, AActor*);
 	DECLARE_HOOK(APrimalStructure_TakeDamage, float, APrimalStructure*, float, FDamageEvent*, AController*, AActor*);
 	DECLARE_HOOK(APrimalDinoCharacter_CanCarryCharacter, bool, APrimalDinoCharacter*, APrimalCharacter*);
+
+	DECLARE_HOOK(AShooterPlayerController_ServerRequestRespawnAtPoint_Impl, void, AShooterPlayerController *, int , int);
 
 	void Hook_AShooterGameMode_InitGame(AShooterGameMode* a_shooter_game_mode, FString* map_name, FString* options,
 	                                    FString* error_message)
@@ -28,7 +33,7 @@ namespace SafeZones::Hooks
 			return 0;
 
 		return APrimalStructure_IsAllowedToBuild_original(_this, PC, AtLocation, AtRotation, OutPlacementData,
-			bDontAdjustForMaxRange, PlayerViewRotation, bFinalPlacement);
+		                                                  bDontAdjustForMaxRange, PlayerViewRotation, bFinalPlacement);
 	}
 
 	float Hook_APrimalCharacter_TakeDamage(APrimalCharacter* _this, float Damage, FDamageEvent* DamageEvent,
@@ -74,29 +79,21 @@ namespace SafeZones::Hooks
 		SafeZoneManager::Get().UpdateOverlaps();
 	}
 
-	/*void OnTick(float)
+	void Hook_AShooterPlayerController_ServerRequestRespawnAtPoint_Impl(AShooterPlayerController* _this, int spawnPointID,
+	                                                                    int spawnRegionIndex)
 	{
-		auto& all_safezones = SafeZoneManager::Get().GetAllSafeZones();
-		for (const auto& safe_zone : all_safezones)
+		AShooterPlayerController_ServerRequestRespawnAtPoint_Impl_original(_this, spawnPointID, spawnRegionIndex);
+
+		auto spawn_points = config.value("OverrideSpawnPoint", nlohmann::json::array());
+		if (!spawn_points.empty())
 		{
-			if (safe_zone->actors.Num() > 0)
-			{
-				for (AActor* actor : safe_zone->actors)
-				{
-					if (actor->IsA(AShooterCharacter::GetPrivateStaticClass()) && FVector::DistSquared(
-						safe_zone->position, actor->DefaultActorLocationField()()) > FMath::Square(safe_zone->radius))
-					{
-						AShooterCharacter* character = static_cast<AShooterCharacter*>(actor);
+			const auto num = static_cast<size_t>(Tools::GetRandomNumber(0, static_cast<int>(spawn_points.size()) - 1));
 
-						FVector velocity;
-						character->GetActorForwardVector(&velocity);
+			auto config_position = spawn_points[num];
 
-						character->CharacterMovementField()()->AddImpulse(velocity * -100, true, false, false);
-					}
-				}
-			}
+			_this->SetPlayerPos(config_position[0], config_position[1], config_position[2]);
 		}
-	}*/
+	}
 
 	void InitHooks()
 	{
@@ -114,6 +111,10 @@ namespace SafeZones::Hooks
 		hooks.SetHook("APrimalDinoCharacter.CanCarryCharacter", &Hook_APrimalDinoCharacter_CanCarryCharacter,
 		              &APrimalDinoCharacter_CanCarryCharacter_original);
 
+		hooks.SetHook("AShooterPlayerController.ServerRequestRespawnAtPoint_Implementation",
+		              &Hook_AShooterPlayerController_ServerRequestRespawnAtPoint_Impl,
+		              &AShooterPlayerController_ServerRequestRespawnAtPoint_Impl_original);
+
 		ArkApi::GetCommands().AddOnTimerCallback("SafeZoneTimer", &Timer);
 	}
 
@@ -127,6 +128,9 @@ namespace SafeZones::Hooks
 		hooks.DisableHook("APrimalCharacter.TakeDamage", &Hook_APrimalCharacter_TakeDamage);
 		hooks.DisableHook("APrimalStructure.TakeDamage", &Hook_APrimalStructure_TakeDamage);
 		hooks.DisableHook("APrimalDinoCharacter.CanCarryCharacter", &Hook_APrimalDinoCharacter_CanCarryCharacter);
+
+		hooks.DisableHook("AShooterPlayerController.ServerRequestRespawnAtPoint_Implementation",
+		                  &Hook_AShooterPlayerController_ServerRequestRespawnAtPoint_Impl);
 
 		ArkApi::GetCommands().RemoveOnTimerCallback("SafeZoneTimer");
 	}

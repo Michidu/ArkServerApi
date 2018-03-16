@@ -18,9 +18,11 @@
     <ClCompile Include="Private\SafeZoneManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Private\Commands.h" />
     <ClInclude Include="Private\Hooks.h" />
     <ClInclude Include="Private\SafeZones.h" />
     <ClInclude Include="Private\SafeZoneManager.h" />
+    <ClInclude Include="Private\SzTools.h" />
     <ClInclude Include="Public\ISafeZoneManager.h" />
     <ClInclude Include="Public\SafeZone.h" />
   </ItemGroup>

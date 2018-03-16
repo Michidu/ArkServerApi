@@ -1,6 +1,5 @@
 #include "SafeZoneManager.h"
 
-#include <API/UE/Math/ColorList.h>
 #include <Permissions.h>
 
 #include "SafeZones.h"
@@ -19,8 +18,8 @@ namespace SafeZones
 		for (const auto& safe_zone : safe_zones)
 		{
 			auto config_position = safe_zone["Position"];
-			auto config_enter_color = safe_zone["EnterNotificationColor"];
-			auto config_leave_color = safe_zone["LeaveNotificationColor"];
+			auto config_success_color = safe_zone["SuccessNotificationColor"];
+			auto config_fail_color = safe_zone["FailNotificationColor"];
 
 			std::string str_name = safe_zone["Name"];
 			FString name = str_name.c_str();
@@ -31,13 +30,17 @@ namespace SafeZones
 			bool prevent_structure_damage = safe_zone["PreventStructureDamage"];
 			bool prevent_building = safe_zone["PreventBuilding"];
 			bool kill_wild_dinos = safe_zone["KillWildDinos"];
+			bool prevent_leaving = safe_zone["PreventLeaving"];
+			bool prevent_entering = safe_zone["PreventEntering"];
 
 			bool enable_events = safe_zone["EnableEvents"];
 			bool screen_notifications = safe_zone["ScreenNotifications"];
 			bool chat_notifications = safe_zone["ChatNotifications"];
 
-			FLinearColor enter_color{config_enter_color[0], config_enter_color[1], config_enter_color[2], config_enter_color[3]};
-			FLinearColor leave_color{config_leave_color[0], config_leave_color[1], config_leave_color[2], config_leave_color[3]};
+			FLinearColor success_color{
+				config_success_color[0], config_success_color[1], config_success_color[2], config_success_color[3]
+			};
+			FLinearColor fail_color{config_fail_color[0], config_fail_color[1], config_fail_color[2], config_fail_color[3]};
 
 			std::vector<FString> messages;
 			for (const auto& msg : safe_zone["Messages"])
@@ -46,8 +49,9 @@ namespace SafeZones
 			}
 
 			CreateSafeZone(std::make_shared<SafeZone>(name, position, radius, prevent_pvp, prevent_structure_damage,
-			                                          prevent_building, kill_wild_dinos, enable_events, screen_notifications,
-			                                          chat_notifications, enter_color, leave_color, messages));
+			                                          prevent_building, kill_wild_dinos, prevent_leaving, prevent_entering,
+			                                          enable_events, screen_notifications, chat_notifications, success_color,
+			                                          fail_color, messages));
 		}
 	}
 
@@ -100,7 +104,7 @@ namespace SafeZones
 				if (FString msg = safe_zone->messages[2];
 					!msg.IsEmpty() && notification)
 				{
-					safe_zone->SendNotification(static_cast<AShooterPlayerController*>(player), msg, FColorList::Red);
+					safe_zone->SendNotification(static_cast<AShooterPlayerController*>(player), msg, safe_zone->fail_color);
 				}
 
 				return false;
@@ -145,8 +149,31 @@ namespace SafeZones
 				static_cast<AShooterCharacter*>(other_actor));
 			if (player)
 			{
+				if (safe_zone->prevent_leaving || safe_zone->prevent_entering)
+				{
+					if (players_pos_.find(player) != players_pos_.end())
+					{
+						auto& player_pos = players_pos_[player];
+
+						player_pos.in_zone = true;
+
+						if (safe_zone->prevent_entering)
+						{
+							const FVector& last_pos = player_pos.outzone_pos;
+							player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
+
+							safe_zone->actors.RemoveSingle(other_actor);
+							return;
+						}
+					}
+					else
+					{
+						players_pos_[player] = {true, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
+					}
+				}
+
 				safe_zone->SendNotification(player, FString::Format(*safe_zone->messages[0], *safe_zone->name),
-				                            safe_zone->enter_notification_color);
+				                            safe_zone->success_color);
 			}
 		}
 		else if (safe_zone->kill_wild_dinos && other_actor->TargetingTeamField()() < 50000 &&
@@ -174,8 +201,24 @@ namespace SafeZones
 				static_cast<AShooterCharacter*>(other_actor));
 			if (player)
 			{
+				if (safe_zone->prevent_leaving || safe_zone->prevent_entering)
+				{
+					auto& player_pos = players_pos_[player];
+
+					player_pos.in_zone = false;
+
+					if (safe_zone->prevent_leaving)
+					{
+						const FVector& last_pos = player_pos.inzone_pos;
+						player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
+
+						safe_zone->actors.Add(other_actor);
+						return;
+					}
+				}
+
 				safe_zone->SendNotification(player, FString::Format(*safe_zone->messages[1], *safe_zone->name),
-				                            safe_zone->leave_notification_color);
+				                            safe_zone->fail_color);
 			}
 		}
 
@@ -231,6 +274,21 @@ namespace SafeZones
 				{
 					OnEnterSafeZone(safe_zone, actor);
 				}
+			}
+		}
+
+		const auto& player_controllers = world->PlayerControllerListField()();
+		for (TWeakObjectPtr<APlayerController> player_controller : player_controllers)
+		{
+			AShooterPlayerController* player = static_cast<AShooterPlayerController*>(player_controller.Get());
+			if (player)
+			{
+				if (players_pos_.find(player) == players_pos_.end())
+					players_pos_[player] = {false, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
+				else if (players_pos_[player].in_zone)
+					players_pos_[player].inzone_pos = player->DefaultActorLocationField()();
+				else
+					players_pos_[player].outzone_pos = player->DefaultActorLocationField()();
 			}
 		}
 	}

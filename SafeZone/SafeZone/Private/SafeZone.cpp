@@ -23,7 +23,9 @@ namespace SafeZones
 
 		if (chat_notifications)
 		{
-			ArkApi::GetApiUtils().SendChatMessage(player, name, *message);
+			ArkApi::GetApiUtils().SendChatMessage(player, name,
+			                                      fmt::format(L"<RichColor Color=\"{0}, {1}, {2}, {3}\">{4}</>", color.R,
+			                                                  color.G, color.B, color.A, *message).c_str());
 		}
 	}
 }

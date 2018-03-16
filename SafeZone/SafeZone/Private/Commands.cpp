@@ -1,3 +1,5 @@
+#include "Commands.h"
+
 #include "SafeZones.h"
 #include "SafeZoneManager.h"
 
@@ -20,7 +22,7 @@ namespace SafeZones::Commands
 		return safezone_config;
 	}
 
-	void SZGiveItems(APlayerController* player_controller, FString* cmd, bool)
+	void SZGiveItems(APlayerController*, FString* cmd, bool)
 	{
 		TArray<FString> parsed;
 		cmd->ParseIntoArray(parsed, L" ", true);
@@ -30,52 +32,52 @@ namespace SafeZones::Commands
 			FString name = parsed[1];
 
 			nlohmann::basic_json<> safezone_config = FindZoneConfigByName(name.ToString());
-			if (!safezone_config.empty())
+			if (safezone_config.empty())
+				return;
+
+			const auto& items_entry = safezone_config.value("ItemsConfig", nlohmann::json::object());
+
+			const auto safe_zone = SafeZoneManager::Get().GetAllSafeZones().FindByPredicate([&name](const auto& safe_zone)
 			{
-				const auto& items_entry = safezone_config.value("ItemsConfig", nlohmann::json::object());
+				return safe_zone->name == name;
+			});
 
-				const auto safe_zone = SafeZoneManager::Get().GetAllSafeZones().FindByPredicate([&name](const auto& safe_zone)
+			if (!safe_zone)
+				return;
+
+			for (AActor* actor : (*safe_zone)->actors)
+			{
+				if (!actor->IsA(AShooterCharacter::GetPrivateStaticClass()))
+					continue;
+
+				AShooterPlayerController* player = ArkApi::GetApiUtils().FindControllerFromCharacter(
+					static_cast<AShooterCharacter*>(actor));
+				if (player)
 				{
-					return safe_zone->name == name;
-				});
-
-				if (!safe_zone)
-					return;
-
-				for (AActor* actor : (*safe_zone)->actors)
-				{
-					if (!actor->IsA(AShooterCharacter::GetPrivateStaticClass()))
-						continue;
-
-					AShooterPlayerController* player = ArkApi::GetApiUtils().FindControllerFromCharacter(
-						static_cast<AShooterCharacter*>(actor));
-					if (player)
+					// Give items
+					auto items_map = items_entry.value("Items", nlohmann::json::array());
+					for (const auto& item : items_map)
 					{
-						// Give items
-						auto items_map = items_entry.value("Items", nlohmann::json::array());
-						for (const auto& item : items_map)
-						{
-							const int amount = item["Amount"];
-							const float quality = item["Quality"];
-							const bool force_blueprint = item["ForceBlueprint"];
-							std::string blueprint = item["Blueprint"];
+						const int amount = item["Amount"];
+						const float quality = item["Quality"];
+						const bool force_blueprint = item["ForceBlueprint"];
+						std::string blueprint = item["Blueprint"];
 
-							FString fblueprint(blueprint.c_str());
+						FString fblueprint(blueprint.c_str());
 
-							player->GiveItem(&fblueprint, amount, quality, force_blueprint);
-						}
+						player->GiveItem(&fblueprint, amount, quality, force_blueprint);
+					}
 
-						// Give dinos
-						auto dinos_map = items_entry.value("Dinos", nlohmann::json::array());
-						for (const auto& dino : dinos_map)
-						{
-							const int level = dino["Level"];
-							std::string blueprint = dino["Blueprint"];
+					// Give dinos
+					auto dinos_map = items_entry.value("Dinos", nlohmann::json::array());
+					for (const auto& dino : dinos_map)
+					{
+						const int level = dino["Level"];
+						std::string blueprint = dino["Blueprint"];
 
-							const FString fblueprint(blueprint.c_str());
+						const FString fblueprint(blueprint.c_str());
 
-							ArkApi::GetApiUtils().SpawnDino(player, fblueprint, nullptr, level, true);
-						}
+						ArkApi::GetApiUtils().SpawnDino(player, fblueprint, nullptr, level, true);
 					}
 				}
 			}

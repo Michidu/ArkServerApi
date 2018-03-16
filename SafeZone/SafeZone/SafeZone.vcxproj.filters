@@ -41,5 +41,11 @@
     <ClInclude Include="Public\ISafeZoneManager.h">
       <Filter>Public</Filter>
     </ClInclude>
+    <ClInclude Include="Private\Commands.h">
+      <Filter>Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Private\SzTools.h">
+      <Filter>Private</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
