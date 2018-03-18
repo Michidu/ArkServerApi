@@ -87,11 +87,17 @@ namespace SafeZones
 
 		TArray<std::function<void(AActor*)>> on_actor_begin_overlap;
 		TArray<std::function<void(AActor*)>> on_actor_end_overlap;
+		TArray<std::function<bool(AShooterPlayerController*)>> can_join_zone;
 
 		// Functions
 
 		ZONE_API bool IsOverlappingActor(AActor* other) const;
 		ZONE_API void SendNotification(AShooterPlayerController* player, const FString& message,
 		                               const FLinearColor& color) const;
+
+		void OnEnterSafeZone(AActor* other_actor);
+		void OnLeaveSafeZone(AActor* other_actor);
+
+		ZONE_API bool CanJoinZone(AShooterPlayerController* player) const;
 	};
 }

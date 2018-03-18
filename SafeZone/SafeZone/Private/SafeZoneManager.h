@@ -17,6 +17,13 @@ struct ATriggerBase : AActor
 
 namespace SafeZones
 {
+	struct PlayerPos
+	{
+		SafeZone* in_zone{};
+		FVector inzone_pos;
+		FVector outzone_pos;
+	};
+
 	class SafeZoneManager : public ISafeZoneManager
 	{
 	public:
@@ -31,26 +38,16 @@ namespace SafeZones
 		bool CanBuild(APlayerController* player, const FVector& location, bool notification) override;
 		bool CheckActorAction(AActor* actor, int type) override;
 
-		void OnEnterSafeZone(const std::shared_ptr<SafeZone>& safe_zone, AActor* other_actor);
-		void OnLeaveSafeZone(const std::shared_ptr<SafeZone>& safe_zone, AActor* other_actor);
-
 		void ReadSafeZones();
 		void UpdateOverlaps();
 
 		TArray<std::shared_ptr<SafeZone>>& GetAllSafeZones();
 
-	private:
-		struct PlayerPos
-		{
-			bool in_zone{};
-			FVector inzone_pos;
-			FVector outzone_pos;
-		};
+		std::unordered_map<AShooterPlayerController*, PlayerPos> players_pos;
 
+	private:
 		SafeZoneManager() = default;
 		~SafeZoneManager() = default;
-
-		std::unordered_map<AShooterPlayerController*, PlayerPos> players_pos_;
 
 		TArray<std::shared_ptr<SafeZone>> all_safezones_;
 	};

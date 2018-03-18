@@ -16,16 +16,18 @@
       "PreventStructureDamage":true,
       "PreventBuilding":true,
       "KillWildDinos":true,
+	  "PreventLeaving":false,
+	  "PreventEntering":true,
       "EnableEvents":true,
       "ScreenNotifications":true,
       "ChatNotifications":true,
-      "EnterNotificationColor":[
+      "SuccessNotificationColor":[
         0,
         1,
         0,
         1
       ],
-      "LeaveNotificationColor":[
+      "FailNotificationColor":[
         1,
         0,
         0,
@@ -34,7 +36,9 @@
       "Messages":[
         "You have entered {0}",
         "You have left {0}",
-        "This is a Community trade center you can not build here"
+        "This is a Community trade center you can not build here",
+		"You are not allowed to enter",
+		"You are not allowed to leave"
       ],
       "ItemsConfig":{
         "Items":[
@@ -53,5 +57,12 @@
         ]
       }
     }
+  ],
+  "OverrideSpawnPoint":[
+    [
+      -111820,
+      233874,
+      -14259.6
+    ]
   ]
 }

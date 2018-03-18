@@ -138,97 +138,6 @@ namespace SafeZones
 		return is_protected;
 	}
 
-	void SafeZoneManager::OnEnterSafeZone(const std::shared_ptr<SafeZone>& safe_zone, AActor* other_actor)
-	{
-		if (!other_actor)
-			return;
-
-		if (other_actor->IsA(AShooterCharacter::GetPrivateStaticClass()))
-		{
-			AShooterPlayerController* player = ArkApi::GetApiUtils().FindControllerFromCharacter(
-				static_cast<AShooterCharacter*>(other_actor));
-			if (player)
-			{
-				if (safe_zone->prevent_leaving || safe_zone->prevent_entering)
-				{
-					if (players_pos_.find(player) != players_pos_.end())
-					{
-						auto& player_pos = players_pos_[player];
-
-						player_pos.in_zone = true;
-
-						if (safe_zone->prevent_entering)
-						{
-							const FVector& last_pos = player_pos.outzone_pos;
-							player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
-
-							safe_zone->actors.RemoveSingle(other_actor);
-							return;
-						}
-					}
-					else
-					{
-						players_pos_[player] = {true, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
-					}
-				}
-
-				safe_zone->SendNotification(player, FString::Format(*safe_zone->messages[0], *safe_zone->name),
-				                            safe_zone->success_color);
-			}
-		}
-		else if (safe_zone->kill_wild_dinos && other_actor->TargetingTeamField()() < 50000 &&
-			other_actor->IsA(APrimalDinoCharacter::GetPrivateStaticClass()))
-		{
-			APrimalDinoCharacter* dino = static_cast<APrimalDinoCharacter*>(other_actor);
-			dino->Suicide();
-		}
-
-		// Execute callbacks
-		for (const auto& callback : safe_zone->on_actor_begin_overlap)
-		{
-			callback(other_actor);
-		}
-	}
-
-	void SafeZoneManager::OnLeaveSafeZone(const std::shared_ptr<SafeZone>& safe_zone, AActor* other_actor)
-	{
-		if (!other_actor)
-			return;
-
-		if (other_actor->IsA(AShooterCharacter::GetPrivateStaticClass()))
-		{
-			AShooterPlayerController* player = ArkApi::GetApiUtils().FindControllerFromCharacter(
-				static_cast<AShooterCharacter*>(other_actor));
-			if (player)
-			{
-				if (safe_zone->prevent_leaving || safe_zone->prevent_entering)
-				{
-					auto& player_pos = players_pos_[player];
-
-					player_pos.in_zone = false;
-
-					if (safe_zone->prevent_leaving)
-					{
-						const FVector& last_pos = player_pos.inzone_pos;
-						player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
-
-						safe_zone->actors.Add(other_actor);
-						return;
-					}
-				}
-
-				safe_zone->SendNotification(player, FString::Format(*safe_zone->messages[1], *safe_zone->name),
-				                            safe_zone->fail_color);
-			}
-		}
-
-		// Execute callbacks
-		for (const auto& callback : safe_zone->on_actor_end_overlap)
-		{
-			callback(other_actor);
-		}
-	}
-
 	void SafeZoneManager::UpdateOverlaps()
 	{
 		UWorld* world = ArkApi::GetApiUtils().GetWorld();
@@ -266,13 +175,13 @@ namespace SafeZones
 				// old_actors now contains only previous overlaps
 				for (const auto& actor : old_actors)
 				{
-					OnLeaveSafeZone(safe_zone, actor);
+					safe_zone->OnLeaveSafeZone(actor);
 				}
 
 				// new_actors now contains only new overlaps
 				for (const auto& actor : new_actors)
 				{
-					OnEnterSafeZone(safe_zone, actor);
+					safe_zone->OnEnterSafeZone(actor);
 				}
 			}
 		}
@@ -283,12 +192,21 @@ namespace SafeZones
 			AShooterPlayerController* player = static_cast<AShooterPlayerController*>(player_controller.Get());
 			if (player)
 			{
-				if (players_pos_.find(player) == players_pos_.end())
-					players_pos_[player] = {false, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
-				else if (players_pos_[player].in_zone)
-					players_pos_[player].inzone_pos = player->DefaultActorLocationField()();
+				if (players_pos.find(player) == players_pos.end())
+					players_pos[player] = {nullptr, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
+				else if (players_pos[player].in_zone)
+				{
+					auto& player_pos = players_pos[player];
+					if (!player_pos.in_zone->CanJoinZone(player))
+					{
+						const FVector& last_pos = player_pos.outzone_pos;
+						player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
+					}
+
+					players_pos[player].inzone_pos = player->DefaultActorLocationField()();
+				}
 				else
-					players_pos_[player].outzone_pos = player->DefaultActorLocationField()();
+					players_pos[player].outzone_pos = player->DefaultActorLocationField()();
 			}
 		}
 	}
