@@ -48,6 +48,9 @@ namespace SafeZones
 				messages.emplace_back(ArkApi::Tools::Utf8Decode(msg).c_str());
 			}
 
+			// Add zone name to the default zones list
+			default_safezones_.Add(name);
+
 			CreateSafeZone(std::make_shared<SafeZone>(name, position, radius, prevent_pvp, prevent_structure_damage,
 			                                          prevent_building, kill_wild_dinos, prevent_leaving, prevent_entering,
 			                                          enable_events, screen_notifications, chat_notifications, success_color,
@@ -55,9 +58,38 @@ namespace SafeZones
 		}
 	}
 
-	void SafeZoneManager::CreateSafeZone(const std::shared_ptr<SafeZone>& safe_zone)
+	bool SafeZoneManager::CreateSafeZone(const std::shared_ptr<SafeZone>& safe_zone)
 	{
+		const auto find_zone = FindZoneByName(safe_zone->name);
+		if (find_zone)
+			return false;
+
 		all_safezones_.Add(safe_zone);
+
+		return true;
+	}
+
+	bool SafeZoneManager::RemoveSafeZone(const FString& name)
+	{
+		const auto find_zone = FindZoneByName(name);
+		if (!find_zone)
+			return false;
+
+		for (auto iter = players_pos.begin(); iter != players_pos.end();)
+		{
+			if (iter->second.in_zone == find_zone.get())
+			{
+				players_pos.erase(iter);
+				break;
+			}
+
+			++iter;
+		}
+
+		all_safezones_.RemoveSingle(find_zone);
+		default_safezones_.RemoveSingle(name);
+
+		return true;
 	}
 
 	/*ATriggerBase* SafeZoneManager::SpawnSphere(FVector& location, int radius, const std::string& type)
@@ -186,14 +218,17 @@ namespace SafeZones
 			}
 		}
 
+		// Update player positions
 		const auto& player_controllers = world->PlayerControllerListField()();
 		for (TWeakObjectPtr<APlayerController> player_controller : player_controllers)
 		{
 			AShooterPlayerController* player = static_cast<AShooterPlayerController*>(player_controller.Get());
 			if (player)
 			{
+				const FVector pos = player->DefaultActorLocationField()();
+
 				if (players_pos.find(player) == players_pos.end())
-					players_pos[player] = {nullptr, player->DefaultActorLocationField()(), player->DefaultActorLocationField()()};
+					players_pos[player] = {nullptr, pos, pos};
 				else if (players_pos[player].in_zone)
 				{
 					auto& player_pos = players_pos[player];
@@ -203,17 +238,35 @@ namespace SafeZones
 						player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
 					}
 
-					players_pos[player].inzone_pos = player->DefaultActorLocationField()();
+					players_pos[player].inzone_pos = pos;
 				}
 				else
-					players_pos[player].outzone_pos = player->DefaultActorLocationField()();
+					players_pos[player].outzone_pos = pos;
 			}
 		}
+	}
+
+	std::shared_ptr<SafeZone> SafeZoneManager::FindZoneByName(const FString& name)
+	{
+		const auto safe_zone = all_safezones_.FindByPredicate([&name](const auto& safe_zone)
+		{
+			return safe_zone->name == name;
+		});
+
+		if (!safe_zone)
+			return nullptr;
+
+		return *safe_zone;
 	}
 
 	TArray<std::shared_ptr<SafeZone>>& SafeZoneManager::GetAllSafeZones()
 	{
 		return all_safezones_;
+	}
+
+	TArray<FString>& SafeZoneManager::GetDefaultSafeZones()
+	{
+		return default_safezones_;
 	}
 
 	// Free function

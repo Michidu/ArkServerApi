@@ -11,13 +11,13 @@
         233874,
         -14259.6
       ],
-      "Radius":800,
+      "Radius":1800,
       "PreventPVP":true,
       "PreventStructureDamage":true,
       "PreventBuilding":true,
       "KillWildDinos":true,
-	  "PreventLeaving":false,
-	  "PreventEntering":true,
+	  "PreventLeaving":true,
+	  "PreventEntering":false,
       "EnableEvents":true,
       "ScreenNotifications":true,
       "ChatNotifications":true,
@@ -57,12 +57,5 @@
         ]
       }
     }
-  ],
-  "OverrideSpawnPoint":[
-    [
-      -111820,
-      233874,
-      -14259.6
-    ]
   ]
 }

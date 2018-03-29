@@ -58,7 +58,6 @@ namespace SafeZones
 
 							const FVector& last_pos = player_pos.outzone_pos;
 							player->SetPlayerPos(last_pos.X, last_pos.Y, last_pos.Z);
-
 							return;
 						}
 					}
@@ -102,7 +101,11 @@ namespace SafeZones
 					auto& players_pos = SafeZoneManager::Get().players_pos;
 					auto& player_pos = players_pos[player];
 
-					player_pos.in_zone = nullptr;
+					if (player_pos.in_zone && !player_pos.in_zone->CanJoinZone(player))
+					{
+						player_pos.in_zone = nullptr;
+						return;
+					}
 
 					if (prevent_leaving)
 					{
@@ -114,6 +117,8 @@ namespace SafeZones
 						actors.Add(other_actor);
 						return;
 					}
+
+					player_pos.in_zone = nullptr;
 				}
 
 				SendNotification(player, FString::Format(*messages[1], *name),
@@ -130,7 +135,7 @@ namespace SafeZones
 
 	bool SafeZone::CanJoinZone(AShooterPlayerController* player) const
 	{
-		bool result = false;
+		bool result = true;
 
 		if (prevent_entering)
 		{
@@ -141,7 +146,7 @@ namespace SafeZones
 
 		for (const auto& callback : can_join_zone)
 		{
-			result |= callback(player);
+			result = callback(player);
 		}
 
 		return result;

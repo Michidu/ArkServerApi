@@ -9,4 +9,5 @@ namespace SafeZones
 	inline nlohmann::json config;
 
 	FString GetText(const std::string& str);
+	void ReadConfig();
 }
